@@ -24,7 +24,10 @@ public class WalletSystem {
                 case 2 -> viewBalance();
                 case 3 -> transferMoney();
                 case 4 -> viewTransactions();
-                case 5 -> System.exit(0);
+                case 5 -> {
+                    System.out.println("Thank you for choosing ExigencyPay. Have a nice day.");
+                    System.exit(0);
+                }
                 default -> System.out.println("Invalid option.");
             }
         }
@@ -39,7 +42,7 @@ public class WalletSystem {
         double balance = sc.nextDouble();
         sc.nextLine();
 
-        User user = new User(userId,userName,balance);
+        User user = new User(userName,userId,balance);
         users.put(userId,user);
         System.out.println("User created Successfully.");
     }
