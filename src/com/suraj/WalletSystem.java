@@ -1,5 +1,7 @@
 package com.suraj;
 import java.util.Scanner;
+import java.io.PrintWriter;
+import java.security.MessageDigest;
 import java.util.HashMap;
 
 public class WalletSystem {
@@ -7,6 +9,8 @@ public class WalletSystem {
     private static HashMap<String, User> users = new HashMap<>();
 
     public static void main(String[] args) {
+        loadUsersFromFile();
+
         while (true){
             System.out.println("\n Welcome to Exigency Pay");
             System.out.println("1. Create User");
@@ -33,6 +37,20 @@ public class WalletSystem {
         }
     }
 
+    private static String hashPassword(String password) {
+        try {
+            MessageDigest md = MessageDigest.getInstance("SHA-256");
+            byte[] hash = md.digest(password.getBytes());
+            StringBuilder sb = new StringBuilder();
+            for (byte b : hash) {
+                sb.append(String.format("%02x", b));
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            throw new RuntimeException("Error hashing password", e);
+        }
+    }
+
     private static void createUser(){
         System.out.println("Enter UserId: ");
         String userId = sc.nextLine();
@@ -41,74 +59,106 @@ public class WalletSystem {
         System.out.println("Enter Initial Balance: ");
         double balance = sc.nextDouble();
         sc.nextLine();
+        System.out.println("Enter a password (PIN): ");
+        String password = sc.nextLine();
 
-        User user = new User(userName,userId,balance);
+        User user = new User(userName,userId,balance, hashPassword(password));
         users.put(userId,user);
         System.out.println("User created Successfully.");
+        saveUsersToFile();
+    }
+
+    private static User login() {
+        System.out.print("Enter User ID: ");
+        String userId = sc.nextLine();
+        System.out.print("Enter Password: ");
+        String password = sc.nextLine();
+
+        User user = users.get(userId);
+        if (user != null && user.getPasswordHash().equals(hashPassword(password))) {
+            System.out.println("Login successful. Welcome " + user.getUserName() + "!");
+            return user;
+        } else {
+            System.out.println("Invalid User ID or Password.");
+            return null;
+        }
     }
 
     private static void viewBalance(){
-        System.out.println("Enter User Id: ");
-        String userId = sc.nextLine();
-        User user = users.get(userId);
-
-        if (user != null){
+        User user = login();
+        if (user != null) {
             System.out.println("Balance = Rs." + user.getBalance());
-        }
-        else{
-            System.out.println("User not found.");
         }
     }
 
     private static void transferMoney(){
-        System.out.println("Enter sender userId: ");
-        String senderUserId = sc.nextLine();
+        User sender = login();  // sender must log in
+        if (sender == null) return;
+
         System.out.println("Enter receiver userId: ");
         String receiverUserId = sc.nextLine();
-        System.out.println("Enter the amount to transfer: ");
-        double amount = sc.nextDouble();
-        sc.nextLine();
-
-        User sender = users.get(senderUserId);
         User receiver = users.get(receiverUserId);
 
-        if (sender == null){
-            System.out.println("Sender user not found.");
-            return;
-        }
-        if (receiver == null){
+        if (receiver == null) {
             System.out.println("Receiver user not found.");
             return;
         }
 
-        if (sender.getBalance() < amount){
+        System.out.println("Enter the amount to transfer: ");
+        double amount = sc.nextDouble();
+        sc.nextLine();
+
+        if (sender.getBalance() < amount) {
             System.out.println("Insufficient Funds");
             return;
         }
 
+        // Perform transfer
         sender.updateBalance(-amount);
         receiver.updateBalance(amount);
 
-        String transaction = "Transferred Rs." + amount + " from " + sender.getUserName() + " to " + receiver.getUserName();
+        // Record transactions
         sender.addTransaction("Sent Rs." + amount + " to " + receiver.getUserName());
-        receiver.addTransaction("Received Rs." + amount + " from " + sender.getUserName() );
+        receiver.addTransaction("Received Rs." + amount + " from " + sender.getUserName());
 
-        System.out.println(transaction);
+        System.out.println("Transferred Rs." + amount + " from " + sender.getUserName() +
+                        " to " + receiver.getUserName());
+
+        saveUsersToFile();
     }
 
     private static void viewTransactions(){
-        System.out.println("Enter User Id: ");
-        String userId = sc.nextLine();
-        User user = users.get(userId);
-
-        if (user != null){
-            System.out.println("Transactions for " + user.getUserName() + " : ");
-            for(String txn : user.getTransactionHistory()){
+        User user = login();  // must log in first
+        if (user != null) {
+            System.out.println("Transactions for " + user.getUserName() + ":");
+            for (String txn : user.getTransactionHistory()) {
                 System.out.println("- " + txn);
             }
         }
-        else{
-            System.out.println("User not found.");
+    }
+
+    private static final String FILE_NAME = "users.txt";
+    
+    private static void saveUsersToFile() {
+        try (PrintWriter writer = new PrintWriter(FILE_NAME)) {
+            for (User user : users.values()) {
+                writer.println(user.toFileString());
+            }
+        } catch (Exception e) {
+            System.out.println("Error saving users: " + e.getMessage());
+        }
+    }
+
+    private static void loadUsersFromFile() {
+        users.clear();
+        try (Scanner fileScanner = new Scanner(new java.io.File(FILE_NAME))) {
+            while (fileScanner.hasNextLine()) {
+                String line = fileScanner.nextLine();
+                User user = User.fromFileString(line);
+                users.put(user.getUserId(), user);
+            }
+        } catch (Exception e) {
+            System.out.println("No saved users found (first time use).");
         }
     }
 }

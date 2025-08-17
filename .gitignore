@@ -5,3 +5,6 @@
 .vscode/
 out/
 bin/
+
+#password and data file
+users.txt
