@@ -14,6 +14,8 @@ public class WalletSystem {
     private static Scanner sc = new Scanner(System.in);
     private static HashMap<String, User> users = new HashMap<>();
     private static User currentUser = null; // maintain logged-in user
+    private static long lastActivityTime = 0; // stores last active timestamp
+    private static final long SESSION_TIMEOUT = 2 * 60 * 1000; // 2 minutes in ms
     private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
     private static final Gson gson = new Gson();
 
@@ -22,6 +24,9 @@ public class WalletSystem {
 
         while (true){
             System.out.println("\n Welcome to Exigency Pay");
+            if (currentUser != null) {
+                System.out.println("[Logged in as " + currentUser.getUserName() + "]");
+            }
             System.out.println("1. Create User");
             System.out.println("2. View User Balance");
             System.out.println("3. Transfer Money");
@@ -29,9 +34,14 @@ public class WalletSystem {
             System.out.println("5. Logout");
             System.out.println("6. Exit");
             System.out.println("Choose option: ");
-            
+
             int choice = sc.nextInt();
             sc.nextLine();
+
+            if (currentUser != null && isSessionExpired()) {
+                System.out.println("⚠️ Session expired. Please log in again.");
+                currentUser = null;
+            }
 
             switch (choice){
                 case 1 -> createUser();
@@ -49,6 +59,18 @@ public class WalletSystem {
                 default -> System.out.println("Invalid option.");
             }
         }
+    }
+
+    private static void refreshSession() {
+        if (currentUser != null) {
+            lastActivityTime = System.currentTimeMillis();
+        }
+    }
+
+    private static boolean isSessionExpired() {
+        if (currentUser == null) return true;
+        long now = System.currentTimeMillis();
+        return (now - lastActivityTime) > SESSION_TIMEOUT;
     }
 
     private static String now() {
@@ -105,6 +127,7 @@ public class WalletSystem {
         User user = users.get(userId);
         if (user != null && user.getPasswordHash().equals(hashPassword(password))) {
             currentUser = user; // store the session
+            refreshSession();
             System.out.println("Login successful. Welcome " + user.getUserName() + "!");
             return user;
         } else {
@@ -118,10 +141,12 @@ public class WalletSystem {
         if (user != null) {
             System.out.println("Balance = Rs." + user.getBalance());
         }
+        refreshSession();
     }
 
     private static void transferMoney(){
         User sender = login();  // sender must log in
+        refreshSession();
         if (sender == null) return;
 
         System.out.println("Enter receiver userId: ");
@@ -158,6 +183,7 @@ public class WalletSystem {
 
     private static void viewTransactions(){
         User user = login();  // must log in first
+        refreshSession();
         if (user != null) {
             System.out.println("Transactions for " + user.getUserName() + ":");
             if (user.getTransactionHistory().isEmpty()) {
