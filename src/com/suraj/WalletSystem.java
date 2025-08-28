@@ -31,8 +31,10 @@ public class WalletSystem {
             System.out.println("2. View User Balance");
             System.out.println("3. Transfer Money");
             System.out.println("4. View Transactions");
-            System.out.println("5. Logout");
-            System.out.println("6. Exit");
+            System.out.println("5. Deposit Money");
+            System.out.println("6. Withdraw Money");
+            System.out.println("7. Logout");
+            System.out.println("8. Exit");
             System.out.println("Choose option: ");
 
             int choice = sc.nextInt();
@@ -48,11 +50,13 @@ public class WalletSystem {
                 case 2 -> viewBalance();
                 case 3 -> transferMoney();
                 case 4 -> viewTransactions();
-                case 5 -> {
+                case 5 -> depositMoney();
+                case 6 -> withdrawMoney();
+                case 7 -> {
                     currentUser = null;
                     System.out.println("Logged out successfully.");
                 }
-                case 6 -> {
+                case 8 -> {
                     System.out.println("Thank you for choosing ExigencyPay. Have a nice day.");
                     System.exit(0);
                 }
@@ -60,6 +64,58 @@ public class WalletSystem {
             }
         }
     }
+
+    private static void depositMoney() {
+        User user = login();
+        refreshSession();
+        if (user == null) return;
+
+        System.out.print("Enter amount to deposit: ");
+        double amount = sc.nextDouble();
+        sc.nextLine();
+
+        if (amount <= 0) {
+            System.out.println("Invalid amount.");
+            return;
+        }
+
+        user.updateBalance(amount);
+
+        // record transaction
+        user.addTransaction(new Transaction("DEPOSIT", amount, "SELF"));
+
+        saveUsersToFile();
+        System.out.println("Rs." + amount + " deposited successfully. New balance = Rs." + user.getBalance());
+    }
+
+    private static void withdrawMoney() {
+        User user = login();
+        refreshSession();
+        if (user == null) return;
+
+        System.out.print("Enter amount to withdraw: ");
+        double amount = sc.nextDouble();
+        sc.nextLine();
+
+        if (amount <= 0) {
+            System.out.println("Invalid amount.");
+            return;
+        }
+
+        if (user.getBalance() < amount) {
+            System.out.println("Insufficient funds.");
+            return;
+        }
+
+        user.updateBalance(-amount);
+
+        // record transaction
+        user.addTransaction(new Transaction("WITHDRAW", amount, "SELF"));
+
+        saveUsersToFile();
+        System.out.println("Rs." + amount + " withdrawn successfully. New balance = Rs." + user.getBalance());
+    }
+
 
     private static void refreshSession() {
         if (currentUser != null) {
