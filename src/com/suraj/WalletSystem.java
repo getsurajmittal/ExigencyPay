@@ -73,6 +73,11 @@ public class WalletSystem {
         return (now - lastActivityTime) > SESSION_TIMEOUT;
     }
 
+    private static String generateOtp() {
+        int otp = 100000 + (int)(Math.random() * 900000); // 6-digit random
+        return String.valueOf(otp);
+    }
+
     private static String now() {
         return LocalDateTime.now().format(DTF);
     }
@@ -114,7 +119,7 @@ public class WalletSystem {
     }
 
     private static User login() {
-        if (currentUser != null) {
+        if (currentUser != null && !isSessionExpired()) {
             // Already logged in
             return currentUser;
         }
@@ -126,15 +131,28 @@ public class WalletSystem {
 
         User user = users.get(userId);
         if (user != null && user.getPasswordHash().equals(hashPassword(password))) {
-            currentUser = user; // store the session
-            refreshSession();
-            System.out.println("Login successful. Welcome " + user.getUserName() + "!");
-            return user;
+            // ✅ Password matched → generate OTP
+            String otp = generateOtp();
+            System.out.println("Your OTP is: " + otp); // simulate sending via SMS/Email
+
+            System.out.print("Enter OTP: ");
+            String enteredOtp = sc.nextLine();
+
+            if (otp.equals(enteredOtp)) {
+                currentUser = user;
+                refreshSession();
+                System.out.println("Login successful. Welcome " + user.getUserName() + "!");
+                return user;
+            } else {
+                System.out.println("❌ Invalid OTP. Login failed.");
+                return null;
+            }
         } else {
-            System.out.println("Invalid User ID or Password.");
+            System.out.println("❌ Invalid User ID or Password.");
             return null;
         }
     }
+
 
     private static void viewBalance(){
         User user = login();
