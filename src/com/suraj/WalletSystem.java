@@ -3,10 +3,19 @@ import java.util.Scanner;
 import java.io.PrintWriter;
 import java.security.MessageDigest;
 import java.util.HashMap;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.UUID;
+import com.google.gson.Gson;
+import com.google.gson.reflect.TypeToken;
+
 
 public class WalletSystem {
     private static Scanner sc = new Scanner(System.in);
     private static HashMap<String, User> users = new HashMap<>();
+    private static User currentUser = null; // maintain logged-in user
+    private static final DateTimeFormatter DTF = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private static final Gson gson = new Gson();
 
     public static void main(String[] args) {
         loadUsersFromFile();
@@ -17,7 +26,8 @@ public class WalletSystem {
             System.out.println("2. View User Balance");
             System.out.println("3. Transfer Money");
             System.out.println("4. View Transactions");
-            System.out.println("5. Exit");
+            System.out.println("5. Logout");
+            System.out.println("6. Exit");
             System.out.println("Choose option: ");
             
             int choice = sc.nextInt();
@@ -29,12 +39,25 @@ public class WalletSystem {
                 case 3 -> transferMoney();
                 case 4 -> viewTransactions();
                 case 5 -> {
+                    currentUser = null;
+                    System.out.println("Logged out successfully.");
+                }
+                case 6 -> {
                     System.out.println("Thank you for choosing ExigencyPay. Have a nice day.");
                     System.exit(0);
                 }
                 default -> System.out.println("Invalid option.");
             }
         }
+    }
+
+    private static String now() {
+        return LocalDateTime.now().format(DTF);
+    }
+
+    private static String txnId() {
+        // short, readable id
+        return UUID.randomUUID().toString().substring(0, 8).toUpperCase();
     }
 
     private static String hashPassword(String password) {
@@ -69,6 +92,11 @@ public class WalletSystem {
     }
 
     private static User login() {
+        if (currentUser != null) {
+            // Already logged in
+            return currentUser;
+        }
+
         System.out.print("Enter User ID: ");
         String userId = sc.nextLine();
         System.out.print("Enter Password: ");
@@ -76,6 +104,7 @@ public class WalletSystem {
 
         User user = users.get(userId);
         if (user != null && user.getPasswordHash().equals(hashPassword(password))) {
+            currentUser = user; // store the session
             System.out.println("Login successful. Welcome " + user.getUserName() + "!");
             return user;
         } else {
@@ -117,12 +146,12 @@ public class WalletSystem {
         sender.updateBalance(-amount);
         receiver.updateBalance(amount);
 
-        // Record transactions
-        sender.addTransaction("Sent Rs." + amount + " to " + receiver.getUserName());
-        receiver.addTransaction("Received Rs." + amount + " from " + sender.getUserName());
+        // Record transactions (with ID + timestamp)
+        String id = txnId();
+        String ts = now();
 
-        System.out.println("Transferred Rs." + amount + " from " + sender.getUserName() +
-                        " to " + receiver.getUserName());
+        sender.addTransaction(new Transaction("SEND", amount, receiver.getUserName()));
+        receiver.addTransaction(new Transaction("RECEIVE", amount, sender.getUserName()));
 
         saveUsersToFile();
     }
@@ -131,7 +160,11 @@ public class WalletSystem {
         User user = login();  // must log in first
         if (user != null) {
             System.out.println("Transactions for " + user.getUserName() + ":");
-            for (String txn : user.getTransactionHistory()) {
+            if (user.getTransactionHistory().isEmpty()) {
+                System.out.println("- No transactions yet.");
+                return;
+            }
+            for (Transaction txn : user.getTransactionHistory()) {
                 System.out.println("- " + txn);
             }
         }
@@ -141,9 +174,8 @@ public class WalletSystem {
     
     private static void saveUsersToFile() {
         try (PrintWriter writer = new PrintWriter(FILE_NAME)) {
-            for (User user : users.values()) {
-                writer.println(user.toFileString());
-            }
+            String json = gson.toJson(users);
+            writer.println(json);
         } catch (Exception e) {
             System.out.println("Error saving users: " + e.getMessage());
         }
@@ -152,10 +184,9 @@ public class WalletSystem {
     private static void loadUsersFromFile() {
         users.clear();
         try (Scanner fileScanner = new Scanner(new java.io.File(FILE_NAME))) {
-            while (fileScanner.hasNextLine()) {
-                String line = fileScanner.nextLine();
-                User user = User.fromFileString(line);
-                users.put(user.getUserId(), user);
+            if (fileScanner.hasNextLine()) {
+                String json = fileScanner.useDelimiter("\\Z").next(); // read entire file
+                users = gson.fromJson(json, new TypeToken<HashMap<String, User>>(){}.getType());
             }
         } catch (Exception e) {
             System.out.println("No saved users found (first time use).");

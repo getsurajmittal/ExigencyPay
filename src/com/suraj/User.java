@@ -6,7 +6,7 @@ public class User {
     private String userName;
     private String userId;
     private double balance;
-    private List<String> transactionHistory;
+    private ArrayList<Transaction> transactionHistory;
     private String passwordHash;
 
     public User(String userName, String userId, double balance, String passwordHash) {
@@ -33,12 +33,12 @@ public class User {
         return balance;
     }
 
-    public List<String> getTransactionHistory(){
+    public ArrayList<Transaction> getTransactionHistory() {
         return transactionHistory;
     }
 
-    public void addTransaction(String transaction){
-        transactionHistory.add(transaction);
+    public void addTransaction(Transaction txn) {
+        transactionHistory.add(txn);
     }
 
     public void updateBalance(double amount){
